@@ -14,19 +14,34 @@ class CallbackGroup(object):
     """A CallbackGroup manages an event loop"""
 
     def __init__(self):
-        self.timer_queue = []
+        self.pending_callbacks = []  # Tuples of (usecs, function)
+        self.subscriptions = {}  # Map of channels to list of functions
         print("Global context initialized")
 
-    def add_callback(self, callback_usecs, callback):
-        self.timer_queue.append((callback_usecs, callback))
-        self.timer_queue.sort()
+    def _add_callback(self, callback_usecs, callback):
+        self.pending_callbacks.append((callback_usecs, callback))
+        self.pending_callbacks.sort()
 
-    def wait_and_step(self):
-        if not self.timer_queue:
+    def _add_subscription(self, topic, func):
+        if topic not in self.subscriptions:
+            self.subscriptions[topic] = []
+
+        self.subscriptions[topic].append(func)
+
+    def _publish(self, topic, msg):
+        if topic not in self.subscriptions:
             return
-        usecs, callback = self.timer_queue.pop(0)
-        utime.sleep_us(usecs - self.clock_us())
+
+        for callback in self.subscriptions[topic]:
+            self.pending_callbacks.append((0, lambda: callback(msg)))
+        self.pending_callbacks.sort()
+
+    def _wait_and_step(self):
+        if not self.pending_callbacks:
+            return
+        usecs, callback = self.pending_callbacks.pop(0)
+        utime.sleep_us(usecs - self._clock_us())
         callback()
 
-    def clock_us(self):
+    def _clock_us(self):
         return utime.ticks_us()

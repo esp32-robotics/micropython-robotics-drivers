@@ -1,5 +1,4 @@
 import urclpy
-import utime
 
 
 def main(args=None):
@@ -9,19 +8,25 @@ def main(args=None):
 
     print(n.get_name())
 
-    # n.create_subscription(int, "/chatter")
-
     i = 1
+
+    pub = n.create_publisher(int, "/chatter", 0)
 
     def print_time():
         nonlocal i
-        print(i)
+        print("Sending:", i)
+        pub.publish(i)
         i += 1
+
+    def on_msg(msg):
+        print("Got message:", msg)
+
+    n.create_subscription(int, "/chatter", on_msg, 0)
 
     n.create_timer(0.2, print_time)
 
     for _ in range(10):
-        n._default_callback_group.wait_and_step()
+        n._default_callback_group._wait_and_step()
 
 
 if __name__ == "__main__":
